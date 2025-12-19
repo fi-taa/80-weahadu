@@ -647,22 +647,21 @@
 
                 const shareText = getShareText();
                 const shareURL = getShareURL();
-                const fullText = `${shareText}\n\n${shareURL}`;
 
                 if (navigator.share) {
                     try {
                         await navigator.share({
                             title: shareText,
-                            text: fullText,
+                            text: shareText,
                             url: shareURL
                         });
                     } catch (err) {
                         if (err.name !== 'AbortError') {
-                            copyToClipboard(fullText);
+                            copyToClipboard(shareURL);
                         }
                     }
                 } else {
-                    copyToClipboard(fullText);
+                    copyToClipboard(shareURL);
                 }
             }
 
@@ -671,22 +670,21 @@
 
                 const shareText = getShareText(verseNumber, verseText);
                 const shareURL = getShareURL(verseNumber);
-                const fullText = `${shareText}\n\n${shareURL}`;
 
                 if (navigator.share) {
                     try {
                         await navigator.share({
                             title: shareText.split('\n\n')[0],
-                            text: fullText,
+                            text: shareText,
                             url: shareURL
                         });
                     } catch (err) {
                         if (err.name !== 'AbortError') {
-                            copyToClipboard(fullText);
+                            copyToClipboard(shareURL);
                         }
                     }
                 } else {
-                    copyToClipboard(fullText);
+                    copyToClipboard(shareURL);
                 }
             }
 
