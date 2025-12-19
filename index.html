@@ -197,6 +197,32 @@
             transition: font-size 0.2s ease;
         }
 
+        .verse-paragraph {
+            cursor: pointer;
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .verse-paragraph:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark-mode .verse-paragraph:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .verse-paragraph.selected {
+            background-color: var(--accent-color-light);
+            color: #000;
+        }
+
+        body.dark-mode .verse-paragraph.selected {
+            background-color: var(--accent-color-dark);
+            color: #000;
+        }
+
         /* DARK MODE STYLES */
         body.dark-mode {
             background-color: var(--bg-primary-dark);
@@ -215,6 +241,28 @@
 
         body.dark-mode .control-btn:hover {
             background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
         }
 
         /* Responsive Design */
@@ -252,6 +300,16 @@
                 <button class="control-btn" id="decrease-font" title="Decrease Font Size">A-</button>
                 <button class="control-btn" id="increase-font" title="Increase Font Size">A+</button>
             </div>
+            <button class="control-btn" id="share-btn" title="Share Chapter">
+                <svg id="share-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+            </button>
             <button class="control-btn" id="theme-toggle" title="Toggle Theme">
                 <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2"></svg>
@@ -323,6 +381,7 @@
             const navPanel = document.getElementById('nav-panel');
             const themeToggleBtn = document.getElementById('theme-toggle');
             const themeIcon = document.getElementById('theme-icon');
+            const shareBtn = document.getElementById('share-btn');
             const decreaseFontBtn = document.getElementById('decrease-font');
             const increaseFontBtn = document.getElementById('increase-font');
             const textContainerEl = document.getElementById('text-container');
@@ -346,6 +405,7 @@
             let currentBookNumber = -1;
             let currentChapterNumber = -1;
             let currentFontSize = 20;
+            let selectedVerseNumber = null;
 
             // --- THEME & SETTINGS ---
             function applyTheme(theme) {
@@ -379,6 +439,7 @@
             });
 
             themeToggleBtn.addEventListener('click', toggleTheme);
+            shareBtn.addEventListener('click', () => shareChapter());
             increaseFontBtn.addEventListener('click', () => applyFontSize(currentFontSize + 2));
             decreaseFontBtn.addEventListener('click', () => applyFontSize(currentFontSize - 2));
 
@@ -449,9 +510,11 @@
                 const chapterData = currentBookData.chapters.find(c => c.chapter === chapterNum);
                 if (chapterData) {
                     currentChapterNumber = chapterNum;
+                    selectedVerseNumber = null;
                     displayChapter(chapterData);
                     updateActiveChapter();
                     saveCurrentState();
+                    updateURL();
                 }
             }
 
@@ -470,16 +533,39 @@
                     if (section.verses) {
                         section.verses.forEach(verse => {
                             const p = document.createElement('p');
+                            p.className = 'verse-paragraph';
+                            p.dataset.verseNumber = verse.verse;
                             const verseNum = document.createElement('sup');
                             verseNum.textContent = verse.verse;
                             verseNum.style.marginRight = '8px';
                             verseNum.style.fontWeight = 'bold';
                             p.appendChild(verseNum);
                             p.append(verse.text);
+                            p.addEventListener('click', () => {
+                                selectedVerseNumber = verse.verse;
+                                document.querySelectorAll('.verse-paragraph').forEach(vp => {
+                                    vp.classList.remove('selected');
+                                });
+                                p.classList.add('selected');
+                                updateURL();
+                                shareVerse(verse.verse, verse.text);
+                            });
                             textContainerEl.appendChild(p);
                         });
                     }
                 });
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const verseParam = urlParams.get('verse');
+                if (verseParam) {
+                    const verseEl = document.querySelector(`.verse-paragraph[data-verse-number="${verseParam}"]`);
+                    if (verseEl) {
+                        setTimeout(() => {
+                            verseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            verseEl.classList.add('selected');
+                        }, 300);
+                    }
+                }
             }
 
             function updateActiveBook() {
@@ -512,6 +598,7 @@
                 initialMessageEl.style.display = 'block';
                 currentBookNumber = -1;
                 currentBookData = null;
+                selectedVerseNumber = null;
 
                 const activeTabStyle = `background-color: var(--accent-color-dark); color: black;`;
                 if (testamentToShow === 'old') {
@@ -521,6 +608,158 @@
                     newTestamentTab.style = activeTabStyle;
                     oldTestamentTab.style = '';
                 }
+            }
+
+            function updateURL() {
+                const params = new URLSearchParams();
+                params.set('book', currentBookNumber);
+                params.set('chapter', currentChapterNumber);
+                if (selectedVerseNumber) {
+                    params.set('verse', selectedVerseNumber);
+                }
+                const newURL = `${window.location.pathname}?${params.toString()}`;
+                window.history.pushState({}, '', newURL);
+            }
+
+            function getShareText(verseNumber = null, verseText = null) {
+                const bookName = currentBookData ? currentBookData.book_name_am : '';
+                const chapterNum = currentChapterNumber;
+                
+                if (verseNumber && verseText) {
+                    return `${bookName} ${chapterNum}:${verseNumber}\n\n${verseText}`;
+                } else {
+                    return `${bookName} - ምዕራፍ ${chapterNum}`;
+                }
+            }
+
+            function getShareURL(verseNumber = null) {
+                const params = new URLSearchParams();
+                params.set('book', currentBookNumber);
+                params.set('chapter', currentChapterNumber);
+                if (verseNumber) {
+                    params.set('verse', verseNumber);
+                }
+                return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+            }
+
+            async function shareChapter() {
+                if (!currentBookData || !currentChapterNumber) return;
+
+                const shareText = getShareText();
+                const shareURL = getShareURL();
+                const fullText = `${shareText}\n\n${shareURL}`;
+
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: shareText,
+                            text: fullText,
+                            url: shareURL
+                        });
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            copyToClipboard(fullText);
+                        }
+                    }
+                } else {
+                    copyToClipboard(fullText);
+                }
+            }
+
+            async function shareVerse(verseNumber, verseText) {
+                if (!currentBookData || !currentChapterNumber || !verseNumber) return;
+
+                const shareText = getShareText(verseNumber, verseText);
+                const shareURL = getShareURL(verseNumber);
+                const fullText = `${shareText}\n\n${shareURL}`;
+
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: shareText.split('\n\n')[0],
+                            text: fullText,
+                            url: shareURL
+                        });
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            copyToClipboard(fullText);
+                        }
+                    }
+                } else {
+                    copyToClipboard(fullText);
+                }
+            }
+
+            function copyToClipboard(text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast('Copied to clipboard');
+                    }).catch(() => {
+                        fallbackCopyToClipboard(text);
+                    });
+                } else {
+                    fallbackCopyToClipboard(text);
+                }
+            }
+
+            function fallbackCopyToClipboard(text) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Copied to clipboard');
+                } catch (err) {
+                    showToast('Failed to copy');
+                }
+                document.body.removeChild(textArea);
+            }
+
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.textContent = message;
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: var(--accent-color-light);
+                    color: #000;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    z-index: 1000;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    animation: slideIn 0.3s ease;
+                `;
+                if (body.classList.contains('dark-mode')) {
+                    toast.style.background = 'var(--accent-color-dark)';
+                }
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => document.body.removeChild(toast), 300);
+                }, 2000);
+            }
+
+            function loadFromURL() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const bookParam = urlParams.get('book');
+                const chapterParam = urlParams.get('chapter');
+                const verseParam = urlParams.get('verse');
+
+                if (bookParam && chapterParam) {
+                    const bookNum = parseInt(bookParam, 10);
+                    const chapterNum = parseInt(chapterParam, 10);
+                    const book = BOOKS.find(b => b.number === bookNum);
+                    
+                    if (book) {
+                        return { book, chapterNum, verseNum: verseParam ? parseInt(verseParam, 10) : null };
+                    }
+                }
+                return null;
             }
 
             async function initializeApp() {
@@ -540,17 +779,26 @@
                     oldTestamentTab.addEventListener('click', () => switchTestament('old'));
                     newTestamentTab.addEventListener('click', () => switchTestament('new'));
 
-                    const savedState = loadSavedState();
-                    if (savedState && savedState.bookNumber) {
-                        const book = BOOKS.find(b => b.number === savedState.bookNumber);
-                        if (book) {
-                            switchTestament(savedState.testament || 'old');
-                            await handleBookSelection(book, savedState.chapterNumber);
+                    const urlState = loadFromURL();
+                    if (urlState) {
+                        switchTestament(urlState.book.testament);
+                        if (urlState.verseNum) {
+                            selectedVerseNumber = urlState.verseNum;
                         }
+                        await handleBookSelection(urlState.book, urlState.chapterNum);
                     } else {
-                        switchTestament('old');
-                        const firstBook = BOOKS.find(b => b.testament === 'old');
-                        if (firstBook) await handleBookSelection(firstBook, 1);
+                        const savedState = loadSavedState();
+                        if (savedState && savedState.bookNumber) {
+                            const book = BOOKS.find(b => b.number === savedState.bookNumber);
+                            if (book) {
+                                switchTestament(savedState.testament || 'old');
+                                await handleBookSelection(book, savedState.chapterNumber);
+                            }
+                        } else {
+                            switchTestament('old');
+                            const firstBook = BOOKS.find(b => b.testament === 'old');
+                            if (firstBook) await handleBookSelection(firstBook, 1);
+                        }
                     }
                 } catch (error) {
                     console.error("Initialization Failed:", error);
